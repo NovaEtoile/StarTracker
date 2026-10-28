@@ -1,5 +1,3 @@
-// Reads a star catalogue and a picture, and prints which way the camera is pointing.
-//
 // Usage:
 //   star_tracker_example <catalogue file> <picture.pgm> [options]
 //
@@ -39,7 +37,7 @@ static bool read_pgm(const std::string& path, std::vector<unsigned char>* data, 
         int v = 0;
         f >> v;
         return v;
-    };
+        };
 
     *width = next_number();
     *height = next_number();
@@ -56,7 +54,7 @@ static bool read_pgm(const std::string& path, std::vector<unsigned char>* data, 
 int main(int argc, char** argv) {
     if (argc < 3) {
         std::cout << "Usage: star_tracker_example <catalogue file> <picture.pgm> [fov=0.13] [cutoff=7] [star_sigma=1.5]\n"
-                  << "                           [selfcal=1] [second=<file.pgm>] [dark=<file.pgm>]\n";
+            << "                           [selfcal=1] [second=<file.pgm>] [dark=<file.pgm>]\n";
         return 1;
     }
 
@@ -122,6 +120,27 @@ int main(int argc, char** argv) {
     st_result r = st_solve(settings, catalogue, picture.data(),
         second_path.empty() ? nullptr : second.data(), have_hot_map ? &hot_map : nullptr);
 
+    // export the detected star centres to a CSV file, for plotting
+    {
+        const st_hot_pixel_map* hot_ptr = have_hot_map ? &hot_map : nullptr;
+        std::vector<fvec2> found = st_find_stars(picture.data(), settings, hot_ptr, nullptr);
+        if (!second_path.empty()) {
+            std::vector<fvec2> second_found = st_find_stars(second.data(), settings, hot_ptr, nullptr);
+            found = confirm_in_both(found, second_found, settings.two_picture_tolerance_pixels);
+        }
+
+        std::ofstream csv("detections.csv");
+        csv << "x,y,brightness\n";
+        for (size_t i = 0; i < found.size(); i++) {
+            int px = (int)std::lround(found[i][0]);
+            int py = (int)std::lround(found[i][1]);
+            int value = 0;
+            if (px >= 0 && px < w && py >= 0 && py < h) value = picture[py * w + px];
+            csv << found[i][0] << "," << found[i][1] << "," << value << "\n";
+        }
+        std::cout << "Detections written to detections.csv: " << found.size() << "\n";
+    }
+
     std::cout << "Stars found: " << r.stars_found << "   brightness threshold: " << r.threshold << " / 255\n";
 
     if (!r.solved) {
@@ -132,8 +151,8 @@ int main(int argc, char** argv) {
     std::cout << "Stars used: " << r.stars_used << "\n";
     if (settings.self_calibrate_fov) {
         std::cout << "Field of view correction found: " << std::showpos << std::fixed << std::setprecision(2)
-                  << 100.0 * r.fov_error << "%" << std::noshowpos << "  (field of view used: "
-                  << std::setprecision(5) << settings.fov * (1.0 + r.fov_error) << " rad)\n";
+            << 100.0 * r.fov_error << "%" << std::noshowpos << "  (field of view used: "
+            << std::setprecision(5) << settings.fov * (1.0 + r.fov_error) << " rad)\n";
     }
 
     // the direction the camera points at, in the sky = third row of the attitude
@@ -157,7 +176,7 @@ int main(int argc, char** argv) {
 
     std::cout << std::fixed << std::setprecision(1);
     std::cout << "Camera points at:  RA " << rh << "h " << rm << "m " << rs << "s   Dec "
-              << (dec_deg < 0 ? "-" : "+") << dd << "d " << dm << "' " << ds << "\"\n";
+        << (dec_deg < 0 ? "-" : "+") << dd << "d " << dm << "' " << ds << "\"\n";
     std::cout << std::setprecision(5);
     std::cout << "                   RA " << ra * 180.0 / pi << " deg   Dec " << dec_deg << " deg\n";
 
@@ -175,7 +194,7 @@ int main(int argc, char** argv) {
     std::cout << std::setprecision(6) << "Attitude (camera direction = attitude * sky direction; camera x right, y down, z forward):\n";
     for (int i = 0; i < 3; i++) {
         std::cout << "  " << std::setw(10) << r.attitude.m[i][0] << " " << std::setw(10) << r.attitude.m[i][1]
-                  << " " << std::setw(10) << r.attitude.m[i][2] << "\n";
+            << " " << std::setw(10) << r.attitude.m[i][2] << "\n";
     }
     return 0;
 }
